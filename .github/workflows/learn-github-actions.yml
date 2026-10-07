@@ -1,0 +1,79 @@
+name: learn-github-actions
+run-name: ${{ github.actor }} is learning GitHub Actions
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Workflow-level variables: available to every job and step.
+env:
+  CLIENT: WCD Bank
+  PROJECT: cloud-enablement
+
+jobs:
+  explore-variables:
+    runs-on: ubuntu-latest
+
+    # Job-level variables: available to every step in this job only.
+    env:
+      ENVIRONMENT: dev
+      # Configuration variable set under Settings > Secrets and variables > Actions > Variables.
+      # Falls back to a default if the variable has not been created.
+      DEPLOY_REGION: ${{ vars.DEPLOY_REGION || 'australiaeast' }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Custom variables at each scope
+        # Step-level variable: only exists in this step.
+        env:
+          GREETING: Hello from the pipeline
+        run: |
+          echo "$GREETING"
+          echo "Client:      $CLIENT"
+          echo "Project:     $PROJECT"
+          echo "Environment: $ENVIRONMENT"
+          echo "Region:      $DEPLOY_REGION"
+
+      - name: Default variables set by GitHub
+        run: |
+          echo "Repository:  $GITHUB_REPOSITORY"
+          echo "Triggered by $GITHUB_EVENT_NAME from $GITHUB_ACTOR"
+          echo "Branch/ref:  $GITHUB_REF_NAME"
+          echo "Commit SHA:  $GITHUB_SHA"
+          echo "Runner OS:   $RUNNER_OS"
+          echo "Workspace:   $GITHUB_WORKSPACE"
+
+      - name: Contexts vs environment variables
+        # ${{ }} expressions are evaluated by GitHub before the job runs on the runner;
+        # $VARS are read by the shell on the runner at run time.
+        run: |
+          echo "Expression: ${{ github.workflow }} run #${{ github.run_number }}"
+          echo "Shell:      $GITHUB_WORKFLOW run #$GITHUB_RUN_NUMBER"
+
+      - name: Set a variable for later steps
+        run: echo "BUILD_TAG=${PROJECT}-${ENVIRONMENT}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
+      - name: Use the variable from the previous step
+        run: echo "Build tag is $BUILD_TAG"
+
+      - name: List repository files
+        run: ls -la "$GITHUB_WORKSPACE"
+
+      - name: Write a job summary
+        run: |
+          {
+            echo "### ${CLIENT} - ${PROJECT}"
+            echo "| Variable | Value |"
+            echo "|---|---|"
+            echo "| Environment | ${ENVIRONMENT} |"
+            echo "| Region | ${DEPLOY_REGION} |"
+            echo "| Build tag | ${BUILD_TAG} |"
+            echo "| Status | ${{ job.status }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
